@@ -2,69 +2,24 @@ stages:
   - build
   - report
 
-variables:
-  GO_VERSION: "1.22"
-  OUTPUT_DIR: "bin"
-
-before_script:
-  - mkdir -p $OUTPUT_DIR
-
-# 构建 Go 二进制
-build_binary:
+# 简单构建步骤
+build:
   stage: build
-  image: golang:$GO_VERSION
   script:
-    - echo "🏗️ Building Go binary..."
-    - go mod tidy
-    - go build -o $OUTPUT_DIR/my-app
-  artifacts:
-    paths:
-      - $OUTPUT_DIR/my-app
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "feature" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
+    - echo "Building..."
 
-# 成功时向 GitHub 上报 CI 状态
-report_success_to_github:
+# 始终报告状态回 GitHub
+report_status_to_github:
   stage: report
   image: curlimages/curl:latest
   script:
-    - echo "✅ Reporting success to GitHub..."
+    - echo "Reporting to GitHub..."
     - |
+      STATE=$( [[ "$CI_JOB_STATUS" == "success" ]] && echo "success" || echo "failure" )
       curl -s -X POST \
         -H "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \
-        https://api.github.com/repos/$GITHUB_REPO/statuses/$CI_COMMIT_SHA \
-        -d "{
-              \"state\": \"success\",
-              \"context\": \"gitlab-ci\",
-              \"description\": \"GitLab CI passed\",
-              \"target_url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"
-            }"
-  when: on_success
-  allow_failure: false
-  needs: [build_binary]
-  rules:
-    - when: always
-
-# 失败时向 GitHub 上报 CI 状态
-report_failure_to_github:
-  stage: report
-  image: curlimages/curl:latest
-  script:
-    - echo "❌ Reporting failure to GitHub..."
-    - |
-      curl -s -X POST \
-        -H "Authorization: token $GITHUB_TOKEN" \
-        -H "Accept: application/vnd.github.v3+json" \
-        https://api.github.com/repos/$GITHUB_REPO/statuses/$CI_COMMIT_SHA \
-        -d "{
-              \"state\": \"failure\",
-              \"context\": \"gitlab-ci\",
-              \"description\": \"GitLab CI failed\",
-              \"target_url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"
-            }"
-  when: on_failure
-  allow_failure: false
-  needs: [build_binary]
-  rules:
-    - when: always
+        https://api.github.com/repos/wangchunsheng-ops/testgithub/statuses/$CI_COMMIT_SHA \
+        -d "{\"state\":\"$STATE\",\"context\":\"gitlab-ci\",\"description\":\"$STATE via GitLab CI\",\"target_url\":\"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"}"
+  when: always
+  needs: [build]

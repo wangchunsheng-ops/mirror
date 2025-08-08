@@ -1,20 +1,11 @@
 stages:
-  - build
   - report
 
-# 简单构建步骤
-build:
-  stage: build
-  tags: [Global-shared-Prod]
-  script:
-    - echo "Building..."
-
-# 始终报告状态回 GitHub
 report_status_to_github:
   stage: report
   image: curlimages/curl:latest
   script:
-    - echo "Reporting to GitHub..."
+    - echo "Reporting status to GitHub..."
     - |
       STATE=$( [[ "$CI_JOB_STATUS" == "success" ]] && echo "success" || echo "failure" )
       curl -s -X POST \
@@ -23,4 +14,3 @@ report_status_to_github:
         https://api.github.com/repos/wangchunsheng-ops/testgithub/statuses/$CI_COMMIT_SHA \
         -d "{\"state\":\"$STATE\",\"context\":\"gitlab-ci\",\"description\":\"$STATE via GitLab CI\",\"target_url\":\"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"}"
   when: always
-  needs: [build]

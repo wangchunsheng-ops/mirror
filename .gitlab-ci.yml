@@ -9,9 +9,9 @@ variables:
 before_script:
   - mkdir -p $OUTPUT_DIR
 
+# 构建 Go 二进制
 build_binary:
   stage: build
-  tags: [Global-shared-Prod]
   image: golang:$GO_VERSION
   script:
     - echo "🏗️ Building Go binary..."
@@ -21,44 +21,50 @@ build_binary:
     paths:
       - $OUTPUT_DIR/my-app
   rules:
-    - when: always
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == "feature" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"'
 
-report_status_to_github:
+# 成功时向 GitHub 上报 CI 状态
+report_success_to_github:
   stage: report
   image: curlimages/curl:latest
   script:
-    - echo "📝 Reporting status to GitHub..."
+    - echo "✅ Reporting success to GitHub..."
     - |
-      if [[ "$CI_JOB_STATUS" == "success" ]]; then
-        STATE="success"
-        DESC="GitLab CI passed OK"
-      else
-        STATE="failure"
-        DESC="GitLab CI failed"
-      fi
-
-      RESPONSE=$(curl -s -w "%{http_code}" -X POST \
+      curl -s -X POST \
         -H "Authorization: token $GITHUB_TOKEN" \
         -H "Accept: application/vnd.github.v3+json" \
         https://api.github.com/repos/$GITHUB_REPO/statuses/$CI_COMMIT_SHA \
         -d "{
-          \"state\": \"$STATE\",
-          \"context\": \"gitlab-ci\",
-          \"description\": \"$DESC\",
-          \"target_url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"
-        }")
-
-      HTTP_CODE="${RESPONSE: -3}"
-      BODY="${RESPONSE:0:-3}"
-
-      echo "GitHub API HTTP code: $HTTP_CODE"
-      echo "GitHub API response: $BODY"
-
-      if [[ "$HTTP_CODE" != "201" && "$HTTP_CODE" != "200" ]]; then
-        echo "❌ Failed to report status to GitHub"
-        exit 1
-      fi
-  when: always
+              \"state\": \"success\",
+              \"context\": \"gitlab-ci\",
+              \"description\": \"GitLab CI passed\",
+              \"target_url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"
+            }"
+  when: on_success
   allow_failure: false
+  needs: [build_binary]
+  rules:
+    - when: always
+
+# 失败时向 GitHub 上报 CI 状态
+report_failure_to_github:
+  stage: report
+  image: curlimages/curl:latest
+  script:
+    - echo "❌ Reporting failure to GitHub..."
+    - |
+      curl -s -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        https://api.github.com/repos/$GITHUB_REPO/statuses/$CI_COMMIT_SHA \
+        -d "{
+              \"state\": \"failure\",
+              \"context\": \"gitlab-ci\",
+              \"description\": \"GitLab CI failed\",
+              \"target_url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"
+            }"
+  when: on_failure
+  allow_failure: false
+  needs: [build_binary]
   rules:
     - when: always

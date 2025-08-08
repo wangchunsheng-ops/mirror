@@ -5,6 +5,7 @@ stages:
 # 简单构建步骤
 build:
   stage: build
+  tags: [Global-shared-Prod]
   script:
     - echo "Building..."
 

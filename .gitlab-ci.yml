@@ -1,0 +1,64 @@
+stages:
+  - build
+  - report
+
+variables:
+  GO_VERSION: "1.22"
+  OUTPUT_DIR: "bin"
+
+before_script:
+  - mkdir -p $OUTPUT_DIR
+
+build_binary:
+  stage: build
+  tags: [Global-shared-Prod]
+  image: golang:$GO_VERSION
+  script:
+    - echo "🏗️ Building Go binary..."
+    - go mod tidy
+    - go build -o $OUTPUT_DIR/my-app
+  artifacts:
+    paths:
+      - $OUTPUT_DIR/my-app
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+
+report_status_to_github:
+  stage: report
+  image: curlimages/curl:latest
+  script:
+    - echo "📝 Reporting status to GitHub..."
+    - |
+      if [[ "$CI_JOB_STATUS" == "success" ]]; then
+        STATE="success"
+        DESC="GitLab CI passed OK"
+      else
+        STATE="failure"
+        DESC="GitLab CI failed"
+      fi
+
+      RESPONSE=$(curl -s -w "%{http_code}" -X POST \
+        -H "Authorization: token $GITHUB_TOKEN" \
+        -H "Accept: application/vnd.github.v3+json" \
+        https://api.github.com/repos/$GITHUB_REPO/statuses/$CI_COMMIT_SHA \
+        -d "{
+          \"state\": \"$STATE\",
+          \"context\": \"gitlab-ci\",
+          \"description\": \"$DESC\",
+          \"target_url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"
+        }")
+
+      HTTP_CODE="${RESPONSE: -3}"
+      BODY="${RESPONSE:0:-3}"
+
+      echo "GitHub API HTTP code: $HTTP_CODE"
+      echo "GitHub API response: $BODY"
+
+      if [[ "$HTTP_CODE" != "201" && "$HTTP_CODE" != "200" ]]; then
+        echo "❌ Failed to report status to GitHub"
+        exit 1
+      fi
+  when: always
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'

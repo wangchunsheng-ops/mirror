@@ -21,8 +21,7 @@ build_binary:
     paths:
       - $OUTPUT_DIR/my-app
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" && $CI_PIPELINE_SOURCE == "merge_request_event"'
+    - when: always
 
 report_status_to_github:
   stage: report
@@ -62,5 +61,4 @@ report_status_to_github:
   when: always
   allow_failure: false
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main" && $CI_PIPELINE_SOURCE == "merge_request_event"'
+    - when: always

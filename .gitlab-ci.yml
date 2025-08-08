@@ -4,6 +4,8 @@ stages:
 report_status_to_github:
   stage: report
   image: curlimages/curl:latest
+  tags:
+    - Global-shared-Prod
   script:
     - echo "Reporting status to GitHub..."
     - |
